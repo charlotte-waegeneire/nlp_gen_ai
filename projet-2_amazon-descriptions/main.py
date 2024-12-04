@@ -6,51 +6,65 @@ from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.schema import Document
 from langchain.chains import RetrievalQA
 from langchain_community.callbacks.manager import get_openai_callback
-from typing import List, Dict
+from typing import List, Dict, Any
 from dotenv import load_dotenv
 import os
 import json
 
-# Charger les variables d'environnement depuis le fichier .env
+# Load environment variables from .env file
 load_dotenv()
 
-# Vérifier que la clé API est bien chargée
+# Check if API key is properly loaded
 api_key = os.getenv("OPENAI_API_KEY")
 if not api_key:
-    raise ValueError("La clé API OpenAI n'a pas été trouvée dans les variables d'environnement")
+    raise ValueError("OpenAI API key not found in environment variables")
 
-# Template du prompt amélioré
-RAG_PROMPT_TEMPLATE = """Tu es un assistant qui répond aux questions sur les produits électroniques.
+# Enhanced prompt template for product-related queries
+RAG_PROMPT_TEMPLATE = """You're an assistant who answers questions about electronic products.
 
-RÈGLES STRICTES:
-1. Avant de répondre, vérifie si les documents fournis contiennent des informations pertinentes
-2. Si des documents pertinents sont trouvés, donne une réponse concise et structurée
-3. Si aucun document pertinent n'est trouvé, réponds UNIQUEMENT: "Aucun document pertinent trouvé pour répondre à cette question.
-4. Utilise UNIQUEMENT les informations des documents fournis
-5. Format de réponse:
-   - Pour une question sur un produit spécifique: donner une description en paragraphe
-   - Pour une comparaison: utiliser des puces (-)
-   - Ne jamais commencer la réponse par un tiret
+STRICT RULES:
+1. Before answering, check that the documents provided contain relevant information.
+2. If relevant documents are found, give a concise, structured answer.
+3. If no relevant documents are found, answer ONLY: "No relevant documents found to answer this question.
+4. Use ONLY the information in the documents provided.
+5. Answer format:
+   - For a question about a specific product: give a paragraph description
+   - For a comparison: use bullets (-)
+   - Never start your answer with a hyphen
 
-Documents disponibles:
+Documents available:
 {context}
 
 Question: {question}"""
 
 
-def load_and_process_data():
-    documents = []
+def load_and_process_data() -> List[Document]:
+    """
+    Load and process product data from JSONL file into document chunks.
+
+    Returns:
+        List[Document]: List of processed document chunks with metadata.
+    """
+    documents: List[Document] = []
     text_splitter = RecursiveCharacterTextSplitter(
-        chunk_size=512,
-        chunk_overlap=128
+        chunk_size=512,  # Size of each text chunk
+        chunk_overlap=128  # Overlap between chunks to maintain context
     )
 
-    def clean_metadata_value(value):
-        """Nettoie les valeurs de métadonnées pour les rendre compatibles avec ChromaDB."""
+    def clean_metadata_value(value: Any) -> str:
+        """
+        Clean metadata values to ensure ChromaDB compatibility.
+
+        Args:
+            value: Any metadata value to clean
+
+        Returns:
+            str: Cleaned metadata value
+        """
         if value is None:
             return ""
         if isinstance(value, (str, int, float, bool)):
-            return value
+            return str(value)
         return str(value)
 
     count = 0
@@ -59,7 +73,7 @@ def load_and_process_data():
             count += 1
             data = json.loads(line)
 
-            # Combiner toutes les informations pertinentes
+            # Combine all relevant product information
             text = ""
             if data.get("title"):
                 text += f"Title: {data['title']}\n"
@@ -70,7 +84,7 @@ def load_and_process_data():
             if data.get("details"):
                 text += f"Details: {', '.join([f'{k}: {str(v)}' for k, v in data['details'].items()])}\n"
 
-            # Nettoyer les métadonnées
+            # Clean and prepare metadata
             metadata = {
                 "title": clean_metadata_value(data.get("title")),
                 "main_category": clean_metadata_value(data.get("main_category")),
@@ -88,8 +102,8 @@ def load_and_process_data():
                 documents.append(doc)
 
     print(f"Loaded {count} products, created {len(documents)} document chunks")
-    # Afficher quelques exemples pour vérification
-    print("\nExemples de documents chargés:")
+    # Display examples for verification
+    print("\nExample loaded documents:")
     for i, doc in enumerate(documents[:2]):
         print(f"\nDocument {i + 1}:")
         print(f"Content: {doc.page_content[:200]}...")
@@ -99,20 +113,30 @@ def load_and_process_data():
 
 
 class ProductRAGSystem:
-    def __init__(self, persist_directory: str = "chroma_db"):
+    """
+    Retrieval-Augmented Generation system for product-related queries.
+    """
+
+    def __init__(self, persist_directory: str = "chroma_db") -> None:
+        """
+        Initialize the RAG system.
+
+        Args:
+            persist_directory: Directory for storing the vector database
+        """
         self.embeddings = HuggingFaceEmbeddings(
             model_name="sentence-transformers/all-MiniLM-L6-v2"
         )
 
-        # Créer le prompt
+        # Create prompt template
         self.prompt = PromptTemplate(
             template=RAG_PROMPT_TEMPLATE,
             input_variables=["context", "question"]
         )
 
-        # Charger ou créer la base de données
+        # Load or create the database
         if not os.path.exists(persist_directory):
-            print("Création d'une nouvelle base de données...")
+            print("Creating new vector database...")
             documents = load_and_process_data()
             self.db = Chroma.from_documents(
                 documents=documents,
@@ -120,29 +144,38 @@ class ProductRAGSystem:
                 persist_directory=persist_directory
             )
         else:
-            print("Chargement de la base de données existante...")
+            print("Loading existing vector database...")
             self.db = Chroma(
                 persist_directory=persist_directory,
                 embedding_function=self.embeddings
             )
 
-    def setup_llm(self, model_name: str = "gpt-3.5-turbo",
-                  temperature: float = 0.0,
-                  top_p: float = 1.0):
-        """Configure le modèle LLM avec les paramètres spécifiés."""
+    def setup_llm(self,
+                  model_name: str = "gpt-3.5-turbo",
+                  temperature: float = 0.0,  # Controls randomness (0=deterministic, 1=creative)
+                  top_p: float = 1.0  # Controls diversity of token selection
+                  ) -> None:
+        """
+        Configure the LLM with specified parameters.
+
+        Args:
+            model_name: Name of the OpenAI model to use
+            temperature: Controls randomness in the output
+            top_p: Controls diversity in token selection
+        """
         self.llm = ChatOpenAI(
             model_name=model_name,
             temperature=temperature,
             top_p=top_p
         )
 
-        # Créer la chaîne RAG
+        # Create RAG chain
         self.qa_chain = RetrievalQA.from_chain_type(
             llm=self.llm,
             chain_type="stuff",
             retriever=self.db.as_retriever(
                 search_type="similarity",
-                search_kwargs={"k": 4}
+                search_kwargs={"k": 4}  # Number of relevant documents to retrieve
             ),
             return_source_documents=True,
             chain_type_kwargs={
@@ -150,27 +183,36 @@ class ProductRAGSystem:
             }
         )
 
-    def query(self, question: str, verbose: bool = False) -> Dict:
-        """Exécute une requête et retourne la réponse avec les métriques."""
+    def query(self, question: str, verbose: bool = False) -> Dict[str, Any]:
+        """
+        Execute a query and return the answer with metrics.
+
+        Args:
+            question: User's question
+            verbose: Whether to print detailed metrics
+
+        Returns:
+            Dict containing the answer, source documents, and usage metrics
+        """
         with get_openai_callback() as cb:
-            # Récupérer les documents pertinents
+            # Retrieve relevant documents
             relevant_docs = self.db.similarity_search(question, k=4)
 
-            # Préparer le contexte
+            # Prepare context
             context = ""
             for i, doc in enumerate(relevant_docs, 1):
                 context += f"\nDocument {i}:\n"
-                context += f"Titre: {doc.metadata['title']}\n"
-                context += f"Contenu: {doc.page_content}\n"
+                context += f"Title: {doc.metadata['title']}\n"
+                context += f"Content: {doc.page_content}\n"
                 context += "-" * 50 + "\n"
 
-            # Exécuter la requête
+            # Execute query
             result = self.qa_chain.invoke({"query": question})
 
             if verbose:
-                print(f"\nMétriques OpenAI:")
-                print(f"Tokens totaux: {cb.total_tokens}")
-                print(f"Coût estimé: ${cb.total_cost:.4f}")
+                print(f"\nOpenAI Metrics:")
+                print(f"Total tokens: {cb.total_tokens}")
+                print(f"Estimated cost: ${cb.total_cost:.4f}")
 
             return {
                 "question": question,
@@ -183,9 +225,17 @@ class ProductRAGSystem:
             }
 
 
-def test_different_parameters():
-    """Teste différentes configurations de paramètres."""
-    rag_system = ProductRAGSystem()  # Créé une seule fois
+def test_different_parameters() -> List[Dict[str, Any]]:
+    """
+    Test different parameter configurations for the RAG system.
+
+    WARNING - This function will execute multiple queries and consume OpenAI credits.
+    It is not used in the final script, but has been provided for demonstration purposes.
+
+    Returns:
+        List of dictionaries containing test results for each configuration
+    """
+    rag_system = ProductRAGSystem()  # Created once
 
     test_questions = [
         "Tell me about OnePlus 7T cases",
@@ -194,14 +244,14 @@ def test_different_parameters():
     ]
 
     configs = [
-        {"temperature": 0.0, "top_p": 1.0},
-        {"temperature": 0.3, "top_p": 0.9},
-        {"temperature": 0.7, "top_p": 0.8}
+        {"temperature": 0.0, "top_p": 1.0},  # Most deterministic
+        {"temperature": 0.3, "top_p": 0.9},  # Balanced
+        {"temperature": 0.7, "top_p": 0.8}  # More creative
     ]
 
     results = []
     for config in configs:
-        print(f"\nTest avec temperature={config['temperature']}, top_p={config['top_p']}")
+        print(f"\nTesting with temperature={config['temperature']}, top_p={config['top_p']}")
         print("-" * 80)
 
         rag_system.setup_llm(
@@ -220,36 +270,40 @@ def test_different_parameters():
     return results
 
 
-def main():
-    # Créer et configurer le système RAG
+def main() -> None:
+    """
+    Main function to demonstrate the RAG system's capabilities.
+    Tests the system with various questions and displays results.
+    """
+    # Create and configure RAG system
     rag_system = ProductRAGSystem()
     rag_system.setup_llm()
 
-    # Questions de test
+    # Test questions including a non-relevant query to verify document usage
     test_questions = [
         "Tell me about OnePlus 7T cases.",
         "What's the best Apple Watch band?",
-        "How can I cook my potatoes ?" # Question non pertinente pour vérifier que le modèle utilise bien les documents
+        "How can I cook my potatoes?"  # Non-relevant question
     ]
 
-    # Tester chaque question
+    # Test each question
     for question in test_questions:
         result = rag_system.query(question)
         print("\n" + "=" * 50)
         print(f"Question: {question}")
-        print(f"Réponse: {result['answer']}")
+        print(f"Answer: {result['answer']}")
 
-        # N'afficher les documents référés que si la réponse n'est pas "Aucun document pertinent..."
-        if not result['answer'].startswith("Aucun document pertinent"):
-            print("\nDocuments référés:")
-            # Éliminer les doublons et afficher uniquement les titres uniques
+        # Only display referenced documents if the answer isn't "No relevant documents..."
+        if not result['answer'].startswith("No relevant documents"):
+            print("\nReferenced Documents:")
+            # Remove duplicates and display unique titles
             unique_docs = list(set(result['source_documents']))
             for doc in unique_docs:
                 print(f"- {doc}")
 
-        print(f"\nMétriques:")
+        print(f"\nMetrics:")
         print(f"Tokens: {result['metrics']['total_tokens']}")
-        print(f"Coût: ${result['metrics']['total_cost']:.4f}")
+        print(f"Cost: ${result['metrics']['total_cost']:.4f}")
         print("=" * 50)
 
 
