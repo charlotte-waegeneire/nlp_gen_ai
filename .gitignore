@@ -1,0 +1,8 @@
+venv/
+.idea/
+**/__pycache__/
+
+**/sandbox/
+**/.env
+
+projet-2_amazon-descriptions/chroma_db
