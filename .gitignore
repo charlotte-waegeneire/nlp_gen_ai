@@ -6,3 +6,5 @@ venv/
 **/.env
 
 projet-2_amazon-descriptions/chroma_db
+
+find_dependencies.py
