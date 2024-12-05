@@ -34,7 +34,7 @@ def load_and_process_data() -> List[Document]:
         return str(value)
 
     count = 0
-    with open("data/meta.jsonl", "r") as f:
+    with open("../data/meta.jsonl", "r") as f:
         for line in f:
             count += 1
             data = json.loads(line)
