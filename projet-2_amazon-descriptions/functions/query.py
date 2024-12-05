@@ -41,7 +41,7 @@ def query(
         return {
             "question": question,
             "answer": result["result"],
-            "source_documents": [doc.metadata['title'] for doc in relevant_docs],
+            "source_documents": [doc.metadata["title"] for doc in relevant_docs],
             "metrics": {
                 "total_tokens": cb.total_tokens,
                 "total_cost": cb.total_cost

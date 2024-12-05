@@ -50,7 +50,6 @@ def load_and_process_data() -> List[Document]:
             if data.get("details"):
                 text += f"Details: {', '.join([f'{k}: {str(v)}' for k, v in data['details'].items()])}\n"
 
-            # Clean and prepare metadata
             metadata = {
                 "title": clean_metadata_value(data.get("title")),
                 "main_category": clean_metadata_value(data.get("main_category")),
@@ -68,7 +67,7 @@ def load_and_process_data() -> List[Document]:
                 documents.append(doc)
 
     print(f"Loaded {count} products, created {len(documents)} document chunks")
-    # Display examples for verification
+
     print("\nExample loaded documents:")
     for i, doc in enumerate(documents[:2]):
         print(f"\nDocument {i + 1}:")
