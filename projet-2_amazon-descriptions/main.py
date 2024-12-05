@@ -32,10 +32,8 @@ def main() -> None:
             for doc in unique_docs:
                 print(f"- {doc}")
 
-        print(f"\nMetrics:")
         print(f"Tokens: {result['metrics']['total_tokens']}")
         print(f"Cost: ${result['metrics']['total_cost']:.4f}")
-        print("=" * 50)
 
 
 if __name__ == "__main__":
