@@ -7,18 +7,18 @@ and a RAG architecture for product descriptions. I wanted to analyze Amazon prod
 
 ### Storage and Processing Requirements
 
-the dataset only contains 1000 reviews from Amazon Review Dataset 2023. The memory usage got pretty high because of the
+The dataset only contains 1000 reviews from Amazon Review Dataset 2023. The memory usage got pretty high because of the
 NLP models - had to keep an eye on that during development.
 
 ### Data Processing Implementation
 
 I started testing with different SpaCy models. I ended up using `en_core_web_sm` because the bigger ones (`_md` and
 `_lg`) didn't really help with my small dataset. Finally, I had to build a custom token validation system to clean up
-the noise in the data.
+the noise in the data. I've kept as much relevant data as I could. 
 
 ### Topic Modeling Architecture
 
-I tried two different clustering methods:
+I tried two different clustering methods.
 
 K-means worked best for me:
 
@@ -28,8 +28,8 @@ K-means worked best for me:
 
 DBSCAN, on the other hand, was kind of a dead end:
 
-- Tested eps values between `0.1` and `1.0`
-- Tried different min_samples (2, 3, 5, 10)
+- Tested `eps` values between `0.1` and `1.0`
+- Tried different `min_samples` (2, 3, 5, 10)
 - Data just didn't work well with it
 
 ### Sentiment Analysis Structure
@@ -43,34 +43,37 @@ correlation metrics and results in the step 3 notebook.
 
 Put together these main parts:
 
-- ChromaDB for the vector stuff
-- `all-MiniLM-L6-v2` for embeddings
-- `GPT-3.5-turbo` as the LLM
-- Streamlit for the frontend
+- ChromaDB for the vector stuff;
+- `all-MiniLM-L6-v2` for embeddings;
+- `GPT-3.5-turbo` as the LLM;
+- Streamlit for the frontend.
 
 ### Implementation Details
 
 For text processing:
 
-- Chunks of 512 chars max
-- 128 chars overlap
+- Chunks of 512 chars max;
+- 128 chars overlap.
 
 For the responses:
 
-- Set temperature to 0.0 to avoid random stuff
-- Top_p at 1.0 to keep all options open
+- Set temperature to 0.0 to avoid random stuff;
+- Top_p at 1.0 to keep all options open.
 
 You can check `test_different_parameters.py` to see how I tested these settings.
 
 ### System Deployment
 
+If you want to try my project, you need to follow these steps:
+
 ```bash
 git clone https://github.com/charlotte-waegeneire/nlp_gen_ai.git
+cd nlp_gen_ai
 pip install -r requirements.txt
 cd projet-2_amazon-descriptions && streamlit run app.py
 ```
 
-Note: Don't forget to add your OpenAI API key in .env
+Note: Don't forget to add your OpenAI API key in a `.env` at the **root of the second project directory**.
 Note²: Streamlit gets weird with paths, so make sure you're in the right directory first
 
 ### What the interface looks like
@@ -82,9 +85,9 @@ Note²: Streamlit gets weird with paths, so make sure you're in the right direct
 
 Keep track of:
 
-- Where the information comes from (documents referred)
-- How many tokens we're using
-- Each query cost
+- Where the information comes from (documents referred);
+- How many tokens we're using;
+- Each query cost.
 
 ## Future Enhancements
 
